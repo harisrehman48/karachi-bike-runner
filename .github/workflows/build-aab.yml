@@ -1,0 +1,54 @@
+name: Build Signed Android AAB
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build web app and sync Capacitor Android
+        run: |
+          npm run build
+          npx cap sync android
+
+      - name: Ensure Android project exists and build release AAB
+        run: |
+          if [ ! -f "android/gradlew" ]; then
+            npx cap add android
+            npx cap sync android
+          fi
+          chmod +x android/gradlew
+          cd android
+          ./gradlew bundleRelease
+
+      - name: Upload AAB artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: karachi-bike-runner-aab
+          path: android/app/build/outputs/bundle/release/*.aab
